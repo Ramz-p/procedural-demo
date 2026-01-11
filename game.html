@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Procedural 96kb Concept</title>
+    <style>body { margin: 0; overflow: hidden; background: #000; }</style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // 1. SETUP THE ENGINE
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.1); // Spooky atmosphere
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. THE ".KKRIEGER" MAGIC: PROCEDURAL TEXTURE GENERATOR
+        // Instead of loading an image, we calculate it pixel by pixel.
+        function generateProceduralTexture() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Fill background (Dark Metal look)
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, size, size);
+
+            // Add procedural "Noise" and "Grit"
+            for (let i = 0; i < 5000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#444' : '#111';
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const w = Math.random() * 50;
+                const h = Math.random() * 2;
+                ctx.fillRect(x, y, w, h);
+            }
+
+            // Add "Alien Tech" glowing lines
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let i=0; i<10; i++) {
+                ctx.moveTo(0, Math.random() * size);
+                ctx.lineTo(size, Math.random() * size);
+            }
+            ctx.stroke();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter; // Retro look
+            return texture;
+        }
+
+        const procTexture = generateProceduralTexture();
+        const material = new THREE.MeshStandardMaterial({ 
+            map: procTexture, 
+            roughness: 0.8,
+            metalness: 0.5
+        });
+
+        // 3. GENERATE THE LEVEL (Procedural Mesh placement)
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        
+        // Generate a long corridor
+        for (let i = 0; i < 50; i++) {
+            // Floor
+            const floor = new THREE.Mesh(geometry, material);
+            floor.position.set(0, -1, -i * 1.5);
+            floor.scale.set(3, 0.1, 1.5);
+            scene.add(floor);
+
+            // Ceiling
+            const ceil = new THREE.Mesh(geometry, material);
+            ceil.position.set(0, 1, -i * 1.5);
+            ceil.scale.set(3, 0.1, 1.5);
+            scene.add(ceil);
+
+            // Walls (Left and Right)
+            if (Math.random() > 0.2) { // Random gaps
+                const wallL = new THREE.Mesh(geometry, material);
+                wallL.position.set(-1.5, 0, -i * 1.5);
+                wallL.scale.set(0.1, 2, 1.5);
+                scene.add(wallL);
+
+                const wallR = new THREE.Mesh(geometry, material);
+                wallR.position.set(1.5, 0, -i * 1.5);
+                wallR.scale.set(0.1, 2, 1.5);
+                scene.add(wallR);
+            }
+        }
+
+        // 4. LIGHTING
+        const light = new THREE.PointLight(0x00ff00, 1, 10);
+        light.position.set(0, 0, 0);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // 5. GAME LOOP
+        camera.position.z = 2;
+        let speed = 0.05;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Move player forward automatically
+            camera.position.z -= speed;
+            light.position.z = camera.position.z - 1;
+
+            // Simple "head bob"
+            camera.position.y = Math.sin(Date.now() * 0.005) * 0.1;
+
+            // Loop the corridor
+            if (camera.position.z < -60) {
+                camera.position.z = 2;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
