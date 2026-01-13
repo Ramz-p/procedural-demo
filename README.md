@@ -1,74 +1,135 @@
-# Procedural 4KB Demo 🚀🎮
+# Procedural Demo 🟢🎮
 
-> Tiny. Wild. Infinite. And yes… only **4KB**.  
+> From a 4KB corridor… to a playable procedural FPS.
 
-This is a **procedural corridor demo** inspired by the legendary .kkrieger — but stripped down to **mad minimalism**. It generates **unlimited textures**, spawns corridors infinitely, and even makes your camera do a little “head bob” while you move forward.  
+This repository started as a **4KB procedural corridor experiment** inspired by the legendary **.kkrieger** philosophy:
+> *Generate everything. Ship nothing.*
 
-💚 **Tiny but mighty**, this demo is proof that **less is sometimes more** (especially if your internet hates big downloads).  
+It has now evolved into a **fully playable procedural FPS prototype** — still asset-free, still experimental, and still obsessed with doing more using less.
 
----
-
-## How to Play 🕹️
-
-1. Download `game.html` from this repo.  
-2. Open it in your **browser** (Chrome, Firefox, Edge — no IE, sorry grandma 😅).  
-3. Sit back and watch the magic unfold:  
-   - Procedural corridors appear infinitely  
-   - Textures generate on the fly  
-   - Your camera automatically moves forward  
-   - Light glows in a hacker-alien-tech kind of way  
-
-⚠️ Pro tip: Don’t blink, you might miss the next corridor.  
+Welcome to **procedural-demo**.
 
 ---
 
-## How It Works 🧠✨
+## 🎮 What This Is
 
-- **Procedural Textures:**  
-  No images, no assets. Just math, noise, and a touch of alien magic 💫.  
-  Every pixel is generated dynamically — that’s how we get unlimited textures in 4KB.  
+A **procedural game experiment** built entirely in:
+- HTML
+- JavaScript
+- Three.js
+- Math (lots of it)
 
-- **Procedural Level:**  
-  Corridors, walls, floors, ceilings — all **spawned programmatically**. Each run is slightly different thanks to randomness.  
+No imported assets.  
+No textures.  
+No sound files.  
+No engines.  
 
-- **Lighting & Effects:**  
-  Glowing green lights, ambient shadows, and tiny head-bob movement to make it feel alive.  
-
-- **Tech Stack:**  
-  - [Three.js](https://threejs.org/) (WebGL magic)  
-  - Pure HTML + JS (no build tools, no node_modules, nothing bloated)  
-
----
-
-## GIF / Screenshot Suggestion 📸
-
-> Example:  
- <img width="1438" height="686" alt="Screenshot 2026-01-12 at 00 54 26" src="https://github.com/user-attachments/assets/3b310309-37d5-41d7-8c83-55226f54f5ef" />
-
+Everything you see *and hear* is generated at runtime.
 
 ---
 
-## Developer Notes 😎
+## 🕹️ How to Play
 
-- This is **not a AAA game**. But it’s like AAA’s crazy little cousin that drinks 10 cups of coffee and runs marathons.  
-- Size matters. 4KB > 4MB. Your Slack channels will thank you.  
-- Infinite corridors = infinite existential dread. Or fun. Depends on your mood.  
-- If your friends ask “what’s this?”, tell them: **“It’s art. Don’t question it.”** 🎨  
+1. Download `game.html` or `game1.html` (your choice)
+2. Open it in a modern browser (Chrome / Firefox / Edge)
+3. Click to lock the mouse and start playing
 
----
+### Controls
+- **WASD** — Move  
+- **Mouse** — Look around  
+- **Click** — Shoot  
 
-## Next Steps 🚀
-
-- Play around with procedural parameters  
-- Add your own textures or AI-generated patterns  
-- Use it as a **tech demo** for NormieGames-level insanity  
+If your browser asks for permission → say **yes**, it’s worth it 😄
 
 ---
 
-## License 📝
+## 🧠 Project Phases
 
-MIT License — because sharing tiny magic is fun. Do whatever you want, just give me credit.  
+### 🟩 Phase 1 — 4KB Procedural Corridor
+- Infinite corridor
+- Procedural textures
+- Automatic forward motion
+- Head-bob + lighting atmosphere
+- Inspired directly by size-restricted demos like `.kkrieger`
+
+This phase proved:
+> “Yes, you can generate entire worlds in a few kilobytes.”
 
 ---
 
-Made with 💚 and a touch of insanity by **[@NormieGames](https://github.com/Ramz-p)**  
+### 🟢 Phase 2 — Playable FPS Prototype (Current)
+
+This is the current version in the repo.
+
+#### New Features
+- First-person shooter controls
+- Pointer-lock mouse look
+- Shooting & hit detection
+- Enemies with health, movement, and death
+- Player health & score system
+- Procedural arena generation
+
+#### Procedural Systems
+- **World Geometry**  
+  Floors, pillars, and walls are generated algorithmically.
+
+- **Textures**  
+  All textures are created at runtime using Canvas — no image files.
+
+- **Audio (No MP3s!)**  
+  Shooting and hit sounds are synthesized using the Web Audio API.
+
+- **Enemies**  
+  Spawn dynamically, move toward the player, react to hits, and disappear when destroyed.
+
+---
+
+## 📸 Screenshot / Visual
+
+pre-phase <img width="1438" height="686" alt="Procedural FPS Screenshot" src="https://github.com/user-attachments/assets/3b310309-37d5-41d7-8c83-55226f54f5ef" />
+phase 1 <img width="1440" height="686" alt="Screenshot 2026-01-14 at 02 32 42" src="https://github.com/user-attachments/assets/555ad62d-e8f6-494e-ad38-8d419259f14f" />
+
+
+*(Yes, this is all generated. No, there are no assets.)*
+
+---
+
+## 🧩 Tech Stack
+
+- [Three.js](https://threejs.org/) — WebGL rendering
+- Canvas API — Procedural textures
+- Web Audio API — Procedural sound
+- Pure HTML + JS — No build tools, no frameworks
+
+---
+
+## 😎 Developer Notes
+
+- This is **not a AAA game** — it’s a AAA *idea* squeezed into a tiny box.
+- If this feels like an old demo scene project… good. That’s intentional.
+- Infinite procedural systems = infinite bugs = infinite fun.
+- If someone asks “what genre is this?”, the correct answer is:
+  **“Yes.”**
+
+---
+
+## 🚧 What’s Next
+
+- Smarter enemy behaviors
+- More aggressive procedural arenas
+- Better pacing & difficulty curves
+- Further pushing the “systems over assets” philosophy
+
+This is not a finished game.  
+It’s a **living experiment**.
+
+---
+
+## 📜 License
+
+MIT License — use it, remix it, break it, just give credit.
+
+---
+
+Made with 💚 and controlled chaos by  
+**[@NormieGames](https://github.com/Ramz-p)**  
