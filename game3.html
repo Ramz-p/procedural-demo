@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Procedural FPS: Phase 3 (Maze & Shotgun)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; user-select: none; }
+        #hud { position: absolute; bottom: 20px; left: 20px; color: #0f0; font-size: 24px; text-shadow: 0 0 5px #0f0; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid #0f0; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; mix-blend-mode: difference; }
+        #instr { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; background: rgba(0,0,0,0.8); padding: 20px; border: 1px solid #0f0; z-index: 10;}
+        .dot { position: absolute; width: 4px; height: 4px; background: #0f0; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    </style>
+</head>
+<body>
+    <div id="hud">HEALTH: 100 | SCORE: 0</div>
+    <div id="crosshair"><div class="dot"></div></div>
+    <div id="instr">
+        <h3>PHASE 3: THE MAZE</h3>
+        CLICK TO START<br>
+        WASD to Move | Click to Shoot (Shotgun)
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // --- SYSTEM CONSTANTS ---
+        let camera, scene, renderer;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
+        let prevTime = performance.now();
+        let enemies = [];
+        let player = { health: 100, score: 0 };
+        let isLocked = false;
+        
+        // MAZE CONFIG
+        const TILE_SIZE = 4; // Size of each maze cell in 3D units
+        const MAZE_SIZE = 15; // 15x15 Grid
+        let mapData = []; // Will hold our 2D maze array (1 = Wall, 0 = Empty)
+
+        // --- 1. PROCEDURAL AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'shoot') {
+                // Shotgun Blast (White Noise burst simulated with randomized waves)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                
+                // Add a second lower layer for "punch"
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(80, now);
+                osc2.frequency.linearRampToValueAtTime(0, now + 0.1);
+                gain2.gain.setValueAtTime(0.3, now);
+                gain2.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc2.start(now);
+                osc2.stop(now + 0.1);
+
+            } else if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // --- 2. PROCEDURAL TEXTURES ---
+        function createTexture(color1, color2, noiseScale) {
+            const size = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color1;
+            ctx.fillRect(0,0,size,size);
+            
+            for(let i=0; i<noiseScale; i++) {
+                ctx.fillStyle = color2;
+                ctx.globalAlpha = 0.15;
+                const s = Math.random() * 40;
+                ctx.fillRect(Math.random()*size, Math.random()*size, s, s);
+            }
+            // Borders (Tiles)
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0,0,size,size);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        // --- 3. MAZE GENERATION (Recursive Backtracker) ---
+        function generateMaze(width, height) {
+            // Initialize grid with walls (1)
+            let maze = Array(height).fill().map(() => Array(width).fill(1));
+            
+            function carve(x, y) {
+                maze[y][x] = 0; // Carve empty space
+                
+                // Define directions: Up, Down, Left, Right
+                const directions = [
+                    [0, -2], [0, 2], [-2, 0], [2, 0]
+                ].sort(() => Math.random() - 0.5); // Shuffle directions
+
+                for (let [dx, dy] of directions) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1 && maze[ny][nx] === 1) {
+                        maze[y + dy/2][x + dx/2] = 0; // Knock down wall between
+                        carve(nx, ny);
+                    }
+                }
+            }
+            carve(1, 1); // Start at top-left
+            return maze;
+        }
+
+        // --- 4. INIT GAME WORLD ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.15); // Higher fog for suspense
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Generate Map
+            mapData = generateMaze(MAZE_SIZE, MAZE_SIZE);
+
+            // Build Mesh from Map Data
+            const wallTex = createTexture('#444', '#777', 3000);
+            const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.8 });
+            const floorMat = new THREE.MeshStandardMaterial({ map: createTexture('#222', '#333', 2000), roughness: 0.5 });
+            const ceilMat = new THREE.MeshStandardMaterial({ map: createTexture('#111', '#222', 1000), roughness: 0.9 });
+            const geo = new THREE.BoxGeometry(TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+            // Floor & Ceiling (Huge plane for optimization)
+            const floorGeo = new THREE.PlaneGeometry(MAZE_SIZE * TILE_SIZE, MAZE_SIZE * TILE_SIZE);
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.set((MAZE_SIZE*TILE_SIZE)/2, -TILE_SIZE/2, (MAZE_SIZE*TILE_SIZE)/2);
+            scene.add(floor);
+
+            const ceil = new THREE.Mesh(floorGeo, ceilMat);
+            ceil.rotation.x = Math.PI / 2;
+            ceil.position.set((MAZE_SIZE*TILE_SIZE)/2, TILE_SIZE/2, (MAZE_SIZE*TILE_SIZE)/2);
+            scene.add(ceil);
+
+            // Walls
+            for(let y=0; y<MAZE_SIZE; y++) {
+                for(let x=0; x<MAZE_SIZE; x++) {
+                    if(mapData[y][x] === 1) {
+                        const wall = new THREE.Mesh(geo, wallMat);
+                        wall.position.set(x * TILE_SIZE + TILE_SIZE/2, 0, y * TILE_SIZE + TILE_SIZE/2);
+                        scene.add(wall);
+                    } else if (Math.random() > 0.9) {
+                         // Random lights in empty spaces
+                         const pl = new THREE.PointLight(0x00ff00, 0.5, 10);
+                         pl.position.set(x * TILE_SIZE, 0, y * TILE_SIZE);
+                         scene.add(pl);
+                    }
+                }
+            }
+
+            // Player Start
+            camera.position.set(TILE_SIZE * 1.5, 0, TILE_SIZE * 1.5);
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0x101010); // Very dark ambient
+            scene.add(ambient);
+            
+            // Player Flashlight
+            const spotLight = new THREE.SpotLight(0xffffff, 1);
+            spotLight.position.set(0,0,0);
+            spotLight.angle = 0.6;
+            spotLight.penumbra = 0.5;
+            spotLight.distance = 20;
+            camera.add(spotLight);
+            spotLight.target = camera;
+            scene.add(camera);
+
+            // Inputs
+            document.body.addEventListener('click', () => {
+                document.body.requestPointerLock();
+                if(isLocked) shoot();
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                isLocked = document.pointerLockElement === document.body;
+                document.getElementById('instr').style.display = isLocked ? 'none' : 'block';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if(isLocked) {
+                    camera.rotation.y -= e.movementX * 0.002;
+                    camera.rotation.x -= e.movementY * 0.002;
+                    camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
+                }
+            });
+
+            document.addEventListener('keydown', (e) => onKey(e.code, true));
+            document.addEventListener('keyup', (e) => onKey(e.code, false));
+        }
+
+        function onKey(code, state) {
+            switch(code) {
+                case 'KeyW': moveForward = state; break;
+                case 'KeyS': moveBackward = state; break;
+                case 'KeyA': moveLeft = state; break;
+                case 'KeyD': moveRight = state; break;
+            }
+        }
+
+        // --- 5. GAME LOGIC ---
+        
+        // Simple Collision Checking
+        function checkCollision(pos) {
+            const x = Math.floor(pos.x / TILE_SIZE);
+            const z = Math.floor(pos.z / TILE_SIZE);
+            // Check bounds
+            if(x < 0 || x >= MAZE_SIZE || z < 0 || z >= MAZE_SIZE) return true;
+            // Check wall
+            return mapData[z][x] === 1;
+        }
+
+        function spawnEnemy() {
+            if(enemies.length > 8) return; 
+            
+            // Find empty spot
+            let ex, ez;
+            do {
+                ex = Math.floor(Math.random() * MAZE_SIZE);
+                ez = Math.floor(Math.random() * MAZE_SIZE);
+            } while(mapData[ez][ex] === 1 || Math.hypot(ex*TILE_SIZE - camera.position.x, ez*TILE_SIZE - camera.position.z) < 8);
+
+            const geometry = new THREE.TetrahedronGeometry(0.6); // Spikier enemy
+            const material = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xaa0000, wireframe: true });
+            const enemy = new THREE.Mesh(geometry, material);
+            
+            enemy.position.set(ex * TILE_SIZE + TILE_SIZE/2, 0, ez * TILE_SIZE + TILE_SIZE/2);
+            scene.add(enemy);
+            enemies.push({ mesh: enemy, hp: 5 }); // More HP
+        }
+
+        function shoot() {
+            playSound('shoot');
+            
+            // Shotgun Spread: 5 Rays
+            const raycaster = new THREE.Raycaster();
+            const hitObjects = enemies.map(e => e.mesh);
+            
+            for(let i=0; i<5; i++) {
+                // Random spread logic
+                const offset = new THREE.Vector2(
+                    (Math.random() - 0.5) * 0.1, 
+                    (Math.random() - 0.5) * 0.1
+                );
+                raycaster.setFromCamera(offset, camera);
+                
+                const intersects = raycaster.intersectObjects(hitObjects);
+
+                if(intersects.length > 0) {
+                    const hitMesh = intersects[0].object;
+                    const dist = intersects[0].distance;
+                    if(dist < 15) { // Shotgun range limit
+                        const enemyData = enemies.find(e => e.mesh === hitMesh);
+                        if(enemyData) {
+                            enemyData.hp--;
+                            playSound('hit');
+                            hitMesh.scale.multiplyScalar(0.9);
+                            // Pushback effect
+                            const pushDir = new THREE.Vector3().subVectors(hitMesh.position, camera.position).normalize();
+                            hitMesh.position.add(pushDir.multiplyScalar(0.5));
+
+                            if(enemyData.hp <= 0) {
+                                scene.remove(hitMesh);
+                                enemies = enemies.filter(e => e !== enemyData);
+                                player.score += 150;
+                                document.getElementById('hud').innerText = `HEALTH: ${player.health} | SCORE: ${player.score}`;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function update() {
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+            prevTime = time;
+
+            // Spawn Enemies randomly near player but not ON player
+            if(Math.random() < 0.02) spawnEnemy();
+
+            // Player Movement with Collision
+            if (isLocked) {
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 60.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 60.0 * delta;
+
+                // Predict next position
+                const nextX = camera.position.x - velocity.x * delta;
+                const nextZ = camera.position.z - velocity.z * delta;
+                
+                // Collision Logic (Simple "Wall Slide" feel)
+                // Check X axis movement
+                if(!checkCollision({x: nextX, z: camera.position.z})) {
+                    camera.translateX(-velocity.x * delta);
+                }
+                // Check Z axis movement
+                if(!checkCollision({x: camera.position.x, z: nextZ})) {
+                    camera.translateZ(-velocity.z * delta);
+                }
+
+                camera.position.y = 0; 
+            }
+
+            // Enemy Logic (Simple Pathfinding: Move direct, but stop at walls)
+            enemies.forEach(e => {
+                e.mesh.rotation.x += delta * 2;
+                e.mesh.rotation.y += delta * 2;
+                
+                const vec = new THREE.Vector3().subVectors(camera.position, e.mesh.position);
+                const dist = vec.length();
+                vec.normalize();
+                
+                const moveSpeed = delta * 3.5;
+                const nextPos = e.mesh.position.clone().add(vec.multiplyScalar(moveSpeed));
+
+                // Basic enemy collision
+                if(!checkCollision(nextPos)) {
+                    e.mesh.position.copy(nextPos);
+                }
+
+                // Attack
+                if(dist < 1.5) {
+                    player.health -= 1;
+                    document.getElementById('hud').innerText = `HEALTH: ${player.health} | SCORE: ${player.score}`;
+                    if(player.health <= 0) {
+                         alert("DIED IN THE MAZE. Score: " + player.score);
+                         location.reload();
+                    }
+                }
+            });
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(update);
+        }
+
+        init();
+        update();
+    </script>
+</body>
+</html>
