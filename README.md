@@ -30,7 +30,7 @@ Everything you see *and hear* is generated at runtime.
 
 ## 🕹️ How to Play
 
-1. Download `game.html` or `game1.html` (your choice)
+1. Download `game.html`, `game2.html`, or `game3.html` (your choice)
 2. Open it in a modern browser (Chrome / Firefox / Edge)
 3. Click to lock the mouse and start playing
 
@@ -57,11 +57,7 @@ This phase proved:
 
 ---
 
-### 🟢 Phase 2 — Playable FPS Prototype (Current)
-
-This is the current version in the repo.
-
-#### New Features
+### 🟢 Phase 2 — Playable FPS Prototype
 - First-person shooter controls
 - Pointer-lock mouse look
 - Shooting & hit detection
@@ -69,25 +65,32 @@ This is the current version in the repo.
 - Player health & score system
 - Procedural arena generation
 
-#### Procedural Systems
-- **World Geometry**  
-  Floors, pillars, and walls are generated algorithmically.
+---
 
-- **Textures**  
-  All textures are created at runtime using Canvas — no image files.
+### 🟥 Phase 3 — The Maze & The Shotgun (New!)
+**File:** `game3.html`
 
-- **Audio (No MP3s!)**  
-  Shooting and hit sounds are synthesized using the Web Audio API.
+Phase 3 introduces actual level structure and weapon variance.
 
-- **Enemies**  
-  Spawn dynamically, move toward the player, react to hits, and disappear when destroyed.
+#### New Features
+- **Maze Generation (Recursive Backtracker):** Instead of an open arena, the world is now a claustrophobic 15x15 maze generated at runtime. No two runs are the same.
+  
+- **Shotgun Mechanics:** Replaced the single-shot laser with a procedural shotgun. It fires 5 raycast spreads per click with randomized recoil.
+  
+- **Physics & Collision:** Added player-to-wall collision detection (wall sliding) so you can navigate the maze without clipping through geometry.
+
+- **Audio Upgrade:** New procedural sound synthesis for the shotgun blast (Sawtooth + Square waves) to give it a "heavier" punch compared to Phase 2.
+
+- **Atmosphere:** Added heavy distance fog to obscure enemies until they are close.
 
 ---
 
 ## 📸 Screenshot / Visual
 
-pre-phase <img width="1438" height="686" alt="Procedural FPS Screenshot" src="https://github.com/user-attachments/assets/3b310309-37d5-41d7-8c83-55226f54f5ef" />
-phase 1 <img width="1440" height="686" alt="Screenshot 2026-01-14 at 02 32 42" src="https://github.com/user-attachments/assets/555ad62d-e8f6-494e-ad38-8d419259f14f" />
+phase 1 <img width="1438" height="686" alt="Procedural FPS Screenshot" src="https://github.com/user-attachments/assets/3b310309-37d5-41d7-8c83-55226f54f5ef" />
+phase 2 <img width="1440" height="686" alt="Screenshot 2026-01-14 at 02 32 42" src="https://github.com/user-attachments/assets/555ad62d-e8f6-494e-ad38-8d419259f14f" />
+phase 3 <img width="1437" height="688" alt="Screenshot 2026-01-16 at 01 16 09" src="https://github.com/user-attachments/assets/bc2e7979-2f1b-4e4b-bf56-fee1659e22e8" />
+
 
 
 *(Yes, this is all generated. No, there are no assets.)*
@@ -132,4 +135,4 @@ MIT License — use it, remix it, break it, just give credit.
 ---
 
 Made with 💚 and controlled chaos by  
-**[@NormieGames](https://github.com/Ramz-p)**  
+**[@NormieGames](https://github.com/Ramz-p)** ```
