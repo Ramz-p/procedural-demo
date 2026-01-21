@@ -30,7 +30,7 @@ Everything you see *and hear* is generated at runtime.
 
 ## 🕹️ How to Play
 
-1. Download `game.html`, `game2.html`, or `game3.html` (your choice)
+1. Download `game.html`, `game2.html`, `game3.html`, or `game4.html` (your choice)
 2. Open it in a modern browser (Chrome / Firefox / Edge)
 3. Click to lock the mouse and start playing
 
@@ -71,17 +71,54 @@ This phase proved:
 **File:** `game3.html`
 
 Phase 3 introduces actual level structure and weapon variance.
-
-#### New Features
 - **Maze Generation (Recursive Backtracker):** Instead of an open arena, the world is now a claustrophobic 15x15 maze generated at runtime. No two runs are the same.
-  
 - **Shotgun Mechanics:** Replaced the single-shot laser with a procedural shotgun. It fires 5 raycast spreads per click with randomized recoil.
-  
 - **Physics & Collision:** Added player-to-wall collision detection (wall sliding) so you can navigate the maze without clipping through geometry.
-
 - **Audio Upgrade:** New procedural sound synthesis for the shotgun blast (Sawtooth + Square waves) to give it a "heavier" punch compared to Phase 2.
-
 - **Atmosphere:** Added heavy distance fog to obscure enemies until they are close.
+
+---
+
+### 🟦 Phase 4 — Final Build: Levels, Portals & Proper Collision
+**File:** `game4.html`
+
+Phase 4 turns the prototype into a **loop-based roguelike FPS experience**.
+
+#### New Systems Introduced
+
+- **Multi-Level Progression**
+  - Levels increase endlessly
+  - Maze size scales with each level
+  - Enemies gain more health as difficulty ramps up
+
+- **Exit Portal System**
+  - Each level spawns a glowing **green portal**
+  - Reach it to escape the maze and advance
+  - Restores partial health between levels
+
+- **Collision System v2 (Robust)**
+  - Player uses a bounding-box collision model
+  - Prevents corner clipping and wall sticking
+  - Enables smooth wall sliding under high velocity
+
+- **Improved Enemy AI**
+  - Enemies navigate maze corridors toward the player
+  - Basic path-following with collision awareness
+  - Damage over time when in close proximity
+
+- **Refined Shotgun Combat**
+  - 6-pellet procedural shotgun
+  - Knockback physics on enemies
+  - Level-scaled enemy HP for longer fights
+
+- **Atmospheric Polish**
+  - Stronger fog for tension and depth
+  - Lantern-style player light
+  - Portal glow used as visual navigation aid
+
+This phase represents the **completion of the core gameplay loop**:
+> Explore → Survive → Escape → Escalate
+
 
 ---
 
