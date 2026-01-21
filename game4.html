@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Procedural FPS: Phase 4 (Final)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; user-select: none; }
+        #hud { position: absolute; bottom: 20px; left: 20px; color: #0f0; font-size: 24px; text-shadow: 0 0 5px #0f0; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid #0f0; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; mix-blend-mode: difference; }
+        #instr { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid #0f0; z-index: 10; cursor: pointer; min-width: 300px; }
+        .dot { position: absolute; width: 4px; height: 4px; background: #0f0; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    </style>
+</head>
+<body>
+    <div id="hud">HP: 100 | LVL: 1 | SCORE: 0</div>
+    <div id="crosshair"><div class="dot"></div></div>
+    <div id="instr">
+        <h2 style="margin:0 0 10px 0; color:#0f0">SYSTEM ONLINE</h2>
+        1. Find the GREEN PORTAL to escape.<br>
+        2. Shoot enemies (Shotgun).<br>
+        3. Walls are solid.<br><br>
+        <b>CLICK TO INITIALIZE</b>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // --- CONSTANTS ---
+        const TILE_SIZE = 6; // Bigger tiles = easier movement
+        const PLAYER_RADIUS = 1.2; // Keep player away from walls
+        
+        // --- STATE ---
+        let camera, scene, renderer;
+        let moveFwd = false, moveBwd = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3(); 
+        let prevTime = performance.now();
+        let enemies = [];
+        let mapData = [];
+        let gameLevel = 1;
+        let player = { hp: 100, score: 0 };
+        let isLocked = false;
+        let mazeSize = 15;
+        let portalMesh;
+
+        // --- AUDIO ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'shoot') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.15);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'portal') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.5);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now); osc.stop(now + 0.5);
+            }
+        }
+
+        // --- TEXTURES ---
+        function createTexture(c1, c2, noise) {
+            const s = 256;
+            const c = document.createElement('canvas');
+            c.width = c.height = s;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = c1; ctx.fillRect(0,0,s,s);
+            for(let i=0; i<noise; i++) {
+                ctx.fillStyle = c2; ctx.globalAlpha = 0.1;
+                ctx.fillRect(Math.random()*s, Math.random()*s, Math.random()*40, Math.random()*40);
+            }
+            ctx.globalAlpha = 1; ctx.strokeStyle = '#111'; ctx.lineWidth = 6; ctx.strokeRect(0,0,s,s);
+            const t = new THREE.CanvasTexture(c);
+            t.magFilter = THREE.NearestFilter;
+            return t;
+        }
+
+        // --- MAZE ---
+        function generateLevel(lvl) {
+            mazeSize = 15 + (lvl * 2); // Maze gets bigger
+            let maze = Array(mazeSize).fill().map(() => Array(mazeSize).fill(1));
+            
+            function carve(x, y) {
+                maze[y][x] = 0;
+                const dirs = [[0,-2],[0,2],[-2,0],[2,0]].sort(()=>Math.random()-0.5);
+                for(let [dx, dy] of dirs) {
+                    const nx = x+dx, ny = y+dy;
+                    if(nx>0 && nx<mazeSize-1 && ny>0 && ny<mazeSize-1 && maze[ny][nx]===1) {
+                        maze[y+dy/2][x+dx/2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+            carve(1,1);
+            // Open Start Area
+            maze[1][2]=0; maze[2][1]=0;
+            return maze;
+        }
+
+        // --- SETUP ---
+        function init() {
+            // Clean up old scene if exists
+            if(renderer) document.body.removeChild(renderer.domElement);
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.07);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            startLevel();
+
+            // Inputs
+            document.body.onclick = () => {
+                document.body.requestPointerLock();
+                if(isLocked) shoot();
+            };
+            document.addEventListener('pointerlockchange', () => {
+                isLocked = document.pointerLockElement === document.body;
+                document.getElementById('instr').style.display = isLocked ? 'none' : 'block';
+            });
+            document.addEventListener('mousemove', e => {
+                if(isLocked) {
+                    camera.rotation.y -= e.movementX * 0.002;
+                    camera.rotation.x -= e.movementY * 0.002;
+                    camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x));
+                }
+            });
+            document.addEventListener('keydown', e => onKey(e.code, true));
+            document.addEventListener('keyup', e => onKey(e.code, false));
+
+            update();
+        }
+
+        function startLevel() {
+            // Reset entities
+            while(scene.children.length > 0) scene.remove(scene.children[0]); 
+            enemies = [];
+            
+            mapData = generateLevel(gameLevel);
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0x505050));
+            const lantern = new THREE.PointLight(0xffaa00, 1, 20);
+            camera.add(lantern);
+            scene.add(camera);
+
+            // Build Mesh
+            const geo = new THREE.BoxGeometry(TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            const matWall = new THREE.MeshStandardMaterial({ map: createTexture('#555','#888',1000), roughness: 0.6 });
+            const matFloor = new THREE.MeshStandardMaterial({ map: createTexture('#222','#444',500), roughness: 0.9 });
+
+            for(let y=0; y<mazeSize; y++) {
+                for(let x=0; x<mazeSize; x++) {
+                    if(mapData[y][x]===1) {
+                        const w = new THREE.Mesh(geo, matWall);
+                        w.position.set(x*TILE_SIZE, TILE_SIZE/2, y*TILE_SIZE);
+                        scene.add(w);
+                    } else {
+                        const f = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), matFloor);
+                        f.rotation.x = -Math.PI/2;
+                        f.position.set(x*TILE_SIZE, 0, y*TILE_SIZE);
+                        scene.add(f);
+                        
+                        const c = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), matFloor);
+                        c.rotation.x = Math.PI/2;
+                        c.position.set(x*TILE_SIZE, TILE_SIZE, y*TILE_SIZE);
+                        scene.add(c);
+                    }
+                }
+            }
+
+            // Place Player
+            camera.position.set(TILE_SIZE, TILE_SIZE*0.4, TILE_SIZE);
+            camera.rotation.set(0,0,0);
+
+            // Place Portal (Furthest point roughly)
+            const pGeo = new THREE.BoxGeometry(2, 4, 2);
+            const pMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+            portalMesh = new THREE.Mesh(pGeo, pMat);
+            
+            // Find empty spot far away
+            let px = mazeSize-2, py = mazeSize-2;
+            while(mapData[py][px] === 1) { px--; py--; }
+            
+            portalMesh.position.set(px*TILE_SIZE, 2, py*TILE_SIZE);
+            scene.add(portalMesh);
+            
+            // Add Portal Light
+            const pLight = new THREE.PointLight(0x00ff00, 2, 15);
+            pLight.position.copy(portalMesh.position);
+            scene.add(pLight);
+        }
+
+        function onKey(k, v) {
+            if(k=='KeyW') moveFwd=v; if(k=='KeyS') moveBwd=v;
+            if(k=='KeyA') moveLeft=v; if(k=='KeyD') moveRight=v;
+        }
+
+        // --- COLLISION SYSTEM V2 (The Fix) ---
+        // Checks if a square box around point (x,z) hits any wall
+        function checkCollision(x, z) {
+            const r = PLAYER_RADIUS;
+            // Check 4 corners of the player's bounding box
+            const points = [
+                {x: x+r, z: z+r}, {x: x-r, z: z+r},
+                {x: x+r, z: z-r}, {x: x-r, z: z-r}
+            ];
+
+            for(let p of points) {
+                const gx = Math.floor((p.x + TILE_SIZE/2) / TILE_SIZE);
+                const gz = Math.floor((p.z + TILE_SIZE/2) / TILE_SIZE);
+                
+                // Out of bounds or Inside Wall
+                if(gx<0 || gx>=mazeSize || gz<0 || gz>=mazeSize || mapData[gz][gx]===1) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function spawnEnemy() {
+            if(enemies.length > 3 + gameLevel) return;
+            let ex, ez, safe=false;
+            for(let i=0; i<20; i++) {
+                ex = Math.floor(Math.random()*mazeSize);
+                ez = Math.floor(Math.random()*mazeSize);
+                // Must be empty space AND far from player
+                if(mapData[ez][ex]===0 && Math.hypot(ex*TILE_SIZE-camera.position.x, ez*TILE_SIZE-camera.position.z) > 20) {
+                    safe=true; break;
+                }
+            }
+            if(!safe) return;
+
+            const mesh = new THREE.Mesh(new THREE.TetrahedronGeometry(1.5), new THREE.MeshStandardMaterial({ color: 0xff0000, wireframe: true }));
+            mesh.position.set(ex*TILE_SIZE, 2, ez*TILE_SIZE);
+            scene.add(mesh);
+            enemies.push({ mesh: mesh, hp: 3 + gameLevel });
+        }
+
+        function shoot() {
+            playSound('shoot');
+            const ray = new THREE.Raycaster();
+            const hits = enemies.map(e=>e.mesh);
+            
+            // 6-Pellet Shotgun
+            for(let i=0; i<6; i++) {
+                ray.setFromCamera({x:(Math.random()-0.5)*0.1, y:(Math.random()-0.5)*0.1}, camera);
+                const isect = ray.intersectObjects(hits);
+                if(isect.length>0 && isect[0].distance < 30) {
+                    const hit = isect[0];
+                    const en = enemies.find(e=>e.mesh===hit.object);
+                    if(en) {
+                        en.hp--;
+                        hit.object.position.add(hit.ray.direction.multiplyScalar(0.5)); // Knockback
+                        if(en.hp<=0) {
+                            scene.remove(en.mesh);
+                            enemies = enemies.filter(e=>e!==en);
+                            player.score += 50;
+                            document.getElementById('hud').innerText = `HP: ${player.hp} | LVL: ${gameLevel} | SCORE: ${player.score}`;
+                        }
+                    }
+                }
+            }
+        }
+
+        function update() {
+            requestAnimationFrame(update);
+            const time = performance.now();
+            const delta = Math.min((time - prevTime)/1000, 0.1); // Cap delta to prevent tunnelling lag
+            prevTime = time;
+
+            if(!isLocked) return;
+
+            if(Math.random() < 0.01) spawnEnemy();
+
+            // --- MOVEMENT PHYSICS ---
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            
+            const dir = new THREE.Vector3();
+            dir.z = Number(moveFwd) - Number(moveBwd);
+            dir.x = Number(moveRight) - Number(moveLeft);
+            dir.normalize();
+
+            if (moveFwd || moveBwd) velocity.z -= dir.z * 100.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= dir.x * 100.0 * delta;
+
+            // PREDICT NEXT POS
+            const nextX = camera.position.x - velocity.x * delta;
+            const nextZ = camera.position.z - velocity.z * delta;
+
+            // ROBUST COLLISION: Check X, then Check Z
+            // This prevents "Sticking" because if X is blocked, we still allow Z movement (Sliding)
+            if(!checkCollision(nextX, camera.position.z)) {
+                camera.position.x = nextX;
+            } else {
+                velocity.x = 0; // Stop momentum on hit
+            }
+            
+            if(!checkCollision(camera.position.x, nextZ)) {
+                camera.position.z = nextZ;
+            } else {
+                velocity.z = 0;
+            }
+
+            // Portal Check
+            portalMesh.rotation.y += delta;
+            if(camera.position.distanceTo(portalMesh.position) < 4) {
+                playSound('portal');
+                gameLevel++;
+                player.hp = Math.min(player.hp + 20, 100);
+                document.getElementById('hud').innerText = `HP: ${player.hp} | LVL: ${gameLevel} | SCORE: ${player.score}`;
+                startLevel();
+            }
+
+            // Enemies
+            enemies.forEach(e => {
+                const vec = new THREE.Vector3().subVectors(camera.position, e.mesh.position);
+                const dist = vec.length();
+                if(dist > 1.5) {
+                    vec.normalize();
+                    const nx = e.mesh.position.x + vec.x * delta * 5; // Enemy Speed
+                    const nz = e.mesh.position.z + vec.z * delta * 5;
+                    // Simple enemy collision (Center point only is fine for AI)
+                    if(!checkCollision(nx, e.mesh.position.z)) e.mesh.position.x = nx;
+                    if(!checkCollision(e.mesh.position.x, nz)) e.mesh.position.z = nz;
+                    e.mesh.lookAt(camera.position);
+                } else {
+                    player.hp -= 0.5;
+                    document.getElementById('hud').innerText = `HP: ${Math.floor(player.hp)} | LVL: ${gameLevel} | SCORE: ${player.score}`;
+                    if(player.hp <= 0) {
+                        alert("GAME OVER. LEVEL: " + gameLevel);
+                        location.reload();
+                    }
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
