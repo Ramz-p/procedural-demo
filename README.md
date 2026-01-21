@@ -127,6 +127,7 @@ This phase represents the **completion of the core gameplay loop**:
 phase 1 <img width="1438" height="686" alt="Procedural FPS Screenshot" src="https://github.com/user-attachments/assets/3b310309-37d5-41d7-8c83-55226f54f5ef" />
 phase 2 <img width="1440" height="686" alt="Screenshot 2026-01-14 at 02 32 42" src="https://github.com/user-attachments/assets/555ad62d-e8f6-494e-ad38-8d419259f14f" />
 phase 3 <img width="1437" height="688" alt="Screenshot 2026-01-16 at 01 16 09" src="https://github.com/user-attachments/assets/bc2e7979-2f1b-4e4b-bf56-fee1659e22e8" />
+phase 4 <img width="1440" height="674" alt="Screenshot 2026-01-22 at 00 31 12" src="https://github.com/user-attachments/assets/7684edde-5fca-411d-8a7d-126e6750dbcc" />
 
 
 
